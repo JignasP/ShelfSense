@@ -60,7 +60,7 @@ No response-time target is asserted before a representative dataset and deployme
 
 ## 6. Traceability and acceptance
 
-The issue tracker will link each requirement to implementation and test evidence. A requirement is complete when its acceptance checks pass and the result is reviewed in a PR. The baseline schema covers part of FR-01, FR-02, FR-03, FR-04, FR-06, FR-07, QR-02, and QR-05; workflow and authorization remain to be implemented.
+The issue tracker will link each requirement to implementation and test evidence. A requirement is complete when its acceptance checks pass and the result is reviewed in a PR. The baseline schema covers part of FR-01, FR-02, FR-03, FR-04, FR-06, FR-07, QR-02, and QR-05. The circulation migration carries FR-03 through FR-07, QR-01, QR-02, and QR-04 at the database layer, with the evidence listed in the [Circulation workflow](circulation-workflow.md); the staff interface and QR-03 authorization remain to be implemented.
 
 ## 7. Terminology
 
