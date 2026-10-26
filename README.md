@@ -32,6 +32,7 @@ psql -X -v ON_ERROR_STOP=1 -d shelfsense -f db/001_baseline.sql
 ```
 
 The migration creates tables, constraints, indexes, a fine calculation function, and a read-only view. It does not seed production data. The future application must run issue and return operations in transactions; the SQL schema alone does not implement the workflow.
+
 An administrator must insert the single `circulation_policy` row before issuing the first loan; the project has not chosen operational fine rates or loan limits on the library's behalf.
 
 To check the baseline in a disposable database after applying the migration:
@@ -44,7 +45,7 @@ The verification script inserts fixtures in a transaction and rolls them back. I
 
 ## Development sequence
 
-Work is organized by phases rather than dates or weeks: foundation, circulation, discovery and reporting, and application verification. GitHub issues carry acceptance criteria so contributors can take ownership independently. Native GitHub milestones can group the issues when milestone creation is available.
+Work is organized by [GitHub phase milestones](https://github.com/JignasP/ShelfSense/milestones) rather than dates or weeks: foundation, circulation, discovery and reporting, and application verification. Issues carry acceptance criteria so contributors can take ownership independently.
 
 ## References
 
