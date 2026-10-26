@@ -4,7 +4,7 @@ ShelfSense is a database-backed library circulation project. It tracks titles, p
 
 ## Status
 
-This repository contains the initial requirements, architecture, and PostgreSQL schema. It does not yet contain a web application. Features described as planned in the documents are not claimed as implemented.
+This repository contains the requirements, architecture, PostgreSQL schema, and the circulation workflow. Issuing and returning a copy run as transaction-safe database functions with automated checks, including a two-session concurrency check. It does not yet contain a web application. Features described as planned in the documents are not claimed as implemented.
 
 ## Scope
 
@@ -17,9 +17,13 @@ The first release is for one library and its staff. It will support catalog and 
 | Software Requirements Specification (SRS) | [docs/software-requirements-specification.md](docs/software-requirements-specification.md) | Verifiable behavior, constraints, and boundaries |
 | Architecture Description (AD) | [docs/architecture-description.md](docs/architecture-description.md) | Context, components, data ownership, and key decisions |
 | Database Design Description (DDD) | [docs/database-design-description.md](docs/database-design-description.md) | Entities, relationships, integrity rules, and schema rationale |
+| Circulation workflow | [docs/circulation-workflow.md](docs/circulation-workflow.md) | Issue and return behavior, failure codes, locking, and fine presentation |
 | Course coverage matrix | [docs/course-coverage.md](docs/course-coverage.md) | Evidence planned for each DBMS unit |
 | PostgreSQL baseline schema | [db/001_baseline.sql](db/001_baseline.sql) | Executable starting schema; not a complete application |
+| PostgreSQL circulation migration | [db/002_circulation.sql](db/002_circulation.sql) | Issue and return transactions, currency configuration, fine presentation |
 | Baseline verification SQL | [db/verify_baseline.sql](db/verify_baseline.sql) | Deterministic checks against a clean test database |
+| Circulation verification SQL | [db/verify_circulation.sql](db/verify_circulation.sql) | Deterministic checks for issue, return, and fine boundaries |
+| Concurrency verification | [scripts/verify_concurrency.sh](scripts/verify_concurrency.sh) | Two-session check that one copy yields exactly one open loan |
 
 These names are chosen with reference to the terminology of ISO/IEC/IEEE 29148:2018, 42010:2022, and 15289:2019. The documents are tailored for a semester project; no standards conformance or certification is claimed.
 
@@ -29,19 +33,22 @@ Requires PostgreSQL 17 or a compatible recent PostgreSQL version. Create an empt
 
 ```sh
 psql -X -v ON_ERROR_STOP=1 -d shelfsense -f db/001_baseline.sql
+psql -X -v ON_ERROR_STOP=1 -d shelfsense -f db/002_circulation.sql
 ```
 
-The migration creates tables, constraints, indexes, a fine calculation function, and a read-only view. It does not seed production data. The future application must run issue and return operations in transactions; the SQL schema alone does not implement the workflow.
+Migration 001 creates tables, constraints, indexes, a fine calculation function, and a read-only view. Migration 002 adds the issue and return transactions, the currency configuration, and the fine presentation described in [docs/circulation-workflow.md](docs/circulation-workflow.md). Neither migration seeds production data. The application still owns authentication and authorization; the database owns the circulation transactions and integrity rules.
 
-An administrator must insert the single `circulation_policy` row before issuing the first loan; the project has not chosen operational fine rates or loan limits on the library's behalf.
+An administrator must insert the single `circulation_policy` row before issuing the first loan; the project has not chosen operational fine rates, loan limits, or a currency on the library's behalf. `currency_code` starts as ISO 4217 `XXX` ("no currency") until it is set.
 
-To check the baseline in a disposable database after applying the migration:
+To check a disposable database after applying both migrations:
 
 ```sh
 psql -X -v ON_ERROR_STOP=1 -d shelfsense_test -f db/verify_baseline.sql
+psql -X -v ON_ERROR_STOP=1 -d shelfsense_test -f db/verify_circulation.sql
+sh scripts/verify_concurrency.sh shelfsense_test
 ```
 
-The verification script inserts fixtures in a transaction and rolls them back. It assumes a fresh test database with the baseline schema and no existing records.
+The two SQL scripts insert fixtures in a transaction and roll them back, so they succeed quietly and print nothing. They assume a fresh test database with no existing records. The concurrency script runs two psql sessions against one copy, so it has to commit its fixtures; it removes them when it passes and leaves them in place when it fails.
 
 ## Development sequence
 

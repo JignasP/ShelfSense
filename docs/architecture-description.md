@@ -39,7 +39,7 @@ Issuing a copy is one database transaction:
 
 Returning a copy locks the open loan, sets its return date once, and commits. The final fine is derived from the recorded return date and policy snapshot. The interface reports a conflict if the loan has already been returned.
 
-This sequence is a design for the circulation phase; the baseline migration only creates the supporting tables and constraints.
+This sequence is implemented by `issue_copy` and `return_copy` in the circulation migration. The [Circulation workflow](circulation-workflow.md) records the lock order, the failure codes, and what the two-session concurrency check measured: the copy row lock, not the unique index, is what normally decides a race between two staff, and the index remains the guarantee against any writer that bypasses the workflow.
 
 ## 5. Data and security views
 
