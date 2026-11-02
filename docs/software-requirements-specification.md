@@ -30,11 +30,11 @@ The application will use PostgreSQL as the authoritative store. A Next.js server
 | FR-06 | Staff shall return an open loan once; the return date shall be recorded without deleting the loan. | Return a loan twice; the second attempt is rejected. |
 | FR-07 | The system shall calculate a fine in minor currency units from days after the due date and grace period, subject to a cap. The fine for a returned loan shall remain fixed; the fine for an open loan shall be calculated as of a stated date. | Compare before-due, within-grace, overdue, capped, and returned cases. |
 | FR-08 | Staff shall see copy availability derived from open loans and withdrawal state. | Issue, return, and withdraw copies; availability changes accordingly. |
-| FR-09 | Staff shall search titles by title, author, or ISBN when the discovery phase is implemented. | Search sample records and inspect results. |
-| FR-10 | Staff shall view overdue loans and circulation summaries when the reporting phase is implemented. | Compare report results with known fixture data. |
-| FR-11 | Members shall be able to join a title's hold queue when the holds phase is implemented; fulfillment shall follow request order among active holds. | Create two holds and verify fulfillment order. |
+| FR-09 | Staff shall search titles by title, author, or ISBN. | Search sample records and inspect results. |
+| FR-10 | Staff shall view overdue loans and circulation summaries. | Compare report results with known fixture data. |
+| FR-11 | Members shall be able to join a title's hold queue; fulfillment shall follow request order among active holds. | Create two holds and verify fulfillment order. |
 
-FR-09 through FR-11 are planned capabilities, not part of the baseline SQL migration.
+FR-08 through FR-11 are implemented at the database layer by migrations 003 to 005 and verified; see the [Discovery and reporting](discovery-and-reporting.md) description. They are not yet reachable through an interface, which is FR-01 through FR-11's remaining dependency on the application phase.
 
 ## 4. Data and business rules
 
@@ -45,6 +45,9 @@ FR-09 through FR-11 are planned capabilities, not part of the baseline SQL migra
 - Money is stored as integer minor units. The initial currency is configured at deployment; mixed currencies are outside scope.
 - Fine policy values are copied onto each loan when issued so later policy changes do not rewrite historical liability.
 - A fine is an amount due calculation, not evidence of a payment or a posted charge.
+- A hold is placed on a title, not on a copy, and any copy of the title satisfies it. A member may hold one title at most once at a time, and a hold is resolved by cancellation or by fulfillment rather than by deletion.
+- A hold reserves one available copy for the member waiting. An issue to anybody else is refused only when it would leave a member already in the queue without a copy.
+- Copy availability is derived from copy and loan records, never stored as a separate status.
 
 ## 5. Quality and interface requirements
 
@@ -56,11 +59,11 @@ FR-09 through FR-11 are planned capabilities, not part of the baseline SQL migra
 | QR-04 | The application shall display dates and amounts unambiguously, including the fine's as-of date and configured currency. | Interface review with overdue and returned examples. |
 | QR-05 | Schema changes shall be reproducible from versioned SQL files against an empty database. | Apply migrations in order to a clean database. |
 
-No response-time target is asserted before a representative dataset and deployment environment are defined. Query plans and indexes will be reviewed with measured workloads in the reporting phase.
+No response-time target is asserted. Query plans and index choices for the discovery and reporting queries have now been measured against a representative dataset, and the results, the dataset size, and the one index the measurement rejected are recorded in [Query performance](query-performance.md). Those numbers come from one developer machine, so they justify the index decisions rather than a service level; a target still depends on a defined deployment environment.
 
 ## 6. Traceability and acceptance
 
-The issue tracker will link each requirement to implementation and test evidence. A requirement is complete when its acceptance checks pass and the result is reviewed in a PR. The baseline schema covers part of FR-01, FR-02, FR-03, FR-04, FR-06, FR-07, QR-02, and QR-05. The circulation migration carries FR-03 through FR-07, QR-01, QR-02, and QR-04 at the database layer, with the evidence listed in the [Circulation workflow](circulation-workflow.md); the staff interface and QR-03 authorization remain to be implemented.
+The issue tracker will link each requirement to implementation and test evidence. A requirement is complete when its acceptance checks pass and the result is reviewed in a PR. The baseline schema covers part of FR-01, FR-02, FR-03, FR-04, FR-06, FR-07, QR-02, and QR-05. The circulation migration carries FR-03 through FR-07, QR-01, QR-02, and QR-04 at the database layer, with the evidence listed in the [Circulation workflow](circulation-workflow.md). The discovery, holds, and reporting migrations carry FR-08, FR-09, FR-10, and FR-11, with the evidence listed in [Discovery and reporting](discovery-and-reporting.md) and the measured plans in [Query performance](query-performance.md). The staff interface and QR-03 authorization remain to be implemented, so no functional requirement is yet complete end to end.
 
 ## 7. Terminology
 
