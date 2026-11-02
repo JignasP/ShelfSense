@@ -215,6 +215,15 @@ COMMENT ON FUNCTION cancel_hold(bigint) IS
 -- three available copies and one hold still serve a walk-in. And a hold
 -- is fulfillable only once a copy remains for every hold ahead of it, so
 -- no hold loses its place to a later one.
+--
+-- This rule compares two aggregates over two tables, so unlike the
+-- one-open-loan rule it cannot be restated as a constraint: a writer
+-- that inserts into loan directly, bypassing issue_copy, can still take
+-- a copy a queued member was waiting for, and nothing in the schema will
+-- stop it. The partial unique index above keeps holding in that case --
+-- the queue itself stays consistent -- but the allocation rule lives in
+-- this function, as the open-loan limit does. See
+-- docs/discovery-and-reporting.md, section 3.
 CREATE OR REPLACE FUNCTION hold_permits_issue(p_copy_id bigint, p_member_id bigint)
 RETURNS boolean
 LANGUAGE sql

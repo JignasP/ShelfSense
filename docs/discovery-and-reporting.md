@@ -196,6 +196,34 @@ Holding the `book` row also means the fulfillment step does not need to
 lock the hold row separately: every operation that changes a title's
 queue already holds that title's book row.
 
+### What the database does not guarantee
+
+The locking above protects the queue against anything that goes through
+`issue_copy`. It does not protect it against a writer that does not.
+
+This is weaker than the guarantee the one-open-loan rule has, and the
+difference is worth being explicit about. A direct `INSERT` into `loan`
+that bypasses `issue_copy` still cannot create a second open loan for a
+copy, because `loan_one_open_per_copy_idx` rejects it — that is what
+QR-02 asks the database to enforce independently of the interface, and
+[scripts/verify_concurrency.sh](../scripts/verify_concurrency.sh)
+measures it. The hold rule has no such backstop. It compares a count of
+free copies against a count of waiting members, and no unique index or
+check constraint can express a rule about two aggregates over two
+tables, so a writer that inserts a loan directly can take the copy a
+queued member was waiting for, and nothing in the schema will stop it.
+
+Both partial unique indexes on `hold` keep working in that situation: a
+member still cannot end up with two active holds on one title, and the
+history stays consistent. What is lost is only the allocation rule.
+
+That places the hold rule on the same footing as the open-loan limit,
+which is also enforced by `issue_copy` rather than by a constraint. The
+consequence for the application phase is the one already recorded in the
+[Architecture Description](architecture-description.md): the server layer
+writes circulation through these functions and does not write to `loan`
+itself.
+
 ### What migration 002 reserved, and what changed
 
 Migration 002 created `hold_permits_issue` as the point where the hold
