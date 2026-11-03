@@ -32,14 +32,17 @@ The server layer owns authentication, authorization, validation, and transaction
 
 Issuing a copy is one database transaction:
 
-1. Lock the member row and the copy row in a consistent order.
-2. Confirm the member is active, the copy is not withdrawn, the member is below the open-loan limit, and any applicable hold rule permits issue.
+1. Lock the member row, the title row, and the copy row in a consistent order.
+2. Confirm the member is active, the copy is not withdrawn, the member is below the open-loan limit, and the hold rule permits issue.
 3. Read the current policy and insert a loan with a policy snapshot.
-4. Commit. A partial unique index on open loans is the final guard against concurrent issue attempts.
+4. Mark the borrower's own active hold for that title fulfilled, if they had one.
+5. Commit. A partial unique index on open loans is the final guard against concurrent issue attempts.
 
 Returning a copy locks the open loan, sets its return date once, and commits. The final fine is derived from the recorded return date and policy snapshot. The interface reports a conflict if the loan has already been returned.
 
-This sequence is implemented by `issue_copy` and `return_copy` in the circulation migration. The [Circulation workflow](circulation-workflow.md) records the lock order, the failure codes, and what the two-session concurrency check measured: the copy row lock, not the unique index, is what normally decides a race between two staff, and the index remains the guarantee against any writer that bypasses the workflow.
+This sequence is implemented by `issue_copy` and `return_copy` in the circulation migration, with the title lock and the hold steps added by the holds migration. The [Circulation workflow](circulation-workflow.md) records the lock order, the failure codes, and what the two-session concurrency check measured: the copy row lock, not the unique index, is what normally decides a race between two staff, and the index remains the guarantee against any writer that bypasses the workflow.
+
+The title row lock exists because the hold rule is a comparison of counts, free copies against members waiting, and two staff acting at once could otherwise both conclude that a copy was spare and between them leave a queued member with nothing. [Discovery and reporting](discovery-and-reporting.md), section 3, states the full lock order and what each operation takes, and its two-session check measures the over-allocation case directly.
 
 ## 5. Data and security views
 
@@ -51,13 +54,17 @@ The relational model is described in the [Database Design Description](database-
 | --- | --- | --- |
 | Separate titles and copies | Availability concerns an individual physical item. | More than one row is needed for a multi-copy title. |
 | Store policy snapshot on each loan | Fine results remain reproducible after a policy change. | Loan creation must copy current policy values. |
-| Derive availability from open loans | Avoids a second mutable status that can disagree with loan history. | Availability queries need an indexed open-loan lookup. |
+| Derive availability from open loans | Avoids a second mutable status that can disagree with loan history. | Availability queries need an indexed open-loan lookup, and a catalog browse has to be paginated against an ordered index rather than counting every title. |
+| Hold a title, not a copy | A member waits for the work; any copy satisfies the wait. | Fulfillment is decided at issue time by counting free copies against the queue, not by attaching a copy to a hold in advance. |
+| Reserve one copy per hold rather than blocking all lending | A single hold on a multi-copy title should not stop every walk-in borrowing it. | The rule needs a title-level lock so that concurrent issues cannot over-allocate the queue. |
 | Keep PostgreSQL as sole authoritative store | Makes constraints and transactions reviewable for the DBMS course. | No independent NoSQL state in the core workflow. |
 
 Neo4j and vector search may be evaluated as optional, isolated demonstrations after the transactional system works. They will not be required for circulation correctness.
 
 ## 7. Verification approach
 
-Database constraint tests, transaction/concurrency tests, server authorization tests, and end-to-end issue/return tests will be linked to requirements. Query plans will be measured using representative fixture data before performance claims are made.
+Database constraint tests, transaction/concurrency tests, server authorization tests, and end-to-end issue/return tests will be linked to requirements.
+
+Constraint and behavior tests exist for the baseline, circulation, discovery, holds, and reporting layers as deterministic SQL scripts that roll their fixtures back, and concurrency is covered by two scripts that run real pairs of psql sessions: one for the one-open-loan rule, one for the hold queue. Query plans have been measured on a representative dataset of 20,000 titles and 150,000 loans, and the results, including an index the measurement rejected and one the dataset is the wrong shape to judge, are recorded in [Query performance](query-performance.md). Server authorization tests and end-to-end tests belong to the application phase and do not exist yet.
 
 The name and view-based structure are informed by [ISO/IEC/IEEE 42010:2022](https://www.iso.org/standard/74393.html). This tailored description is not asserted to conform to the full standard.

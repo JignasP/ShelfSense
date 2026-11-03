@@ -1,7 +1,7 @@
 # Circulation workflow
 
 **Project:** ShelfSense
-**Status:** Implemented in [db/002_circulation.sql](../db/002_circulation.sql) and verified
+**Status:** Implemented in [db/002_circulation.sql](../db/002_circulation.sql) and verified; `issue_copy` and `hold_permits_issue` later revised by [db/004_holds.sql](../db/004_holds.sql)
 **Covers:** FR-03, FR-04, FR-05, FR-06, FR-07, QR-01, QR-02, QR-04
 
 This document describes the issue and return operations added in migration
@@ -21,6 +21,11 @@ caller's transaction, so a failure leaves no partial change (QR-01).
 | `loan_fine_as_of(loan_id, as_of_date DEFAULT CURRENT_DATE)` | Fine for one loan at a stated date, with currency and display text. |
 | `format_minor_amount(amount_minor, currency_code, minor_digits)` | Renders a minor-unit amount for display. |
 | `hold_permits_issue(copy_id, member_id)` | Hold rule evaluated during an issue. See section 5. |
+
+Migration 004 replaced the body of `hold_permits_issue` with the real
+hold rule and revised `issue_copy`. Section 5 records what changed; the
+rule itself is described in
+[Discovery and reporting](discovery-and-reporting.md), section 3.
 
 `loan_fine_statement` is a view with one row per loan: borrower, title,
 barcode, the three dates, the as-of date, the fine in minor units, and the
@@ -62,6 +67,13 @@ Both functions take the copy row first among the rows they share, and only
 therefore acquire these locks in opposite orders, so they cannot deadlock
 against each other.
 
+Migration 004 inserts the title's `book` row into that order, between the
+member row and the copy row, so that decisions about one title's hold
+queue are serialised. The full order across every circulation operation
+is then `member` → `book` → `copy` → `loan` → `hold`, and `return_copy`
+is unchanged: it still takes only the copy row and that copy's open
+loan.
+
 Two consequences are worth stating plainly, because they were measured
 rather than assumed:
 
@@ -91,8 +103,8 @@ not an expected outcome.
 
 | Code | Meaning | Raised by |
 | --- | --- | --- |
-| `SS001` | No member with that member number | `issue_copy` |
-| `SS002` | Member is not active | `issue_copy` |
+| `SS001` | No member with that member number | `issue_copy`, `place_hold` |
+| `SS002` | Member is not active | `issue_copy`, `place_hold` |
 | `SS003` | No copy with that barcode | `issue_copy`, `return_copy` |
 | `SS004` | Copy has been withdrawn | `issue_copy` |
 | `SS005` | Copy already has an open loan | `issue_copy` |
@@ -102,6 +114,9 @@ not an expected outcome.
 | `SS009` | Copy has already been returned | `return_copy` |
 | `SS010` | No circulation policy is configured | `issue_copy` |
 | `SS011` | Return date precedes the issue date | `return_copy` |
+
+Codes `SS012` to `SS015` belong to the hold operations and are listed in
+[Discovery and reporting](discovery-and-reporting.md), section 5.
 
 ## 4. Fines and their presentation
 
@@ -140,15 +155,28 @@ lives on the single policy row rather than on every loan.
 
 ## 5. The hold rule
 
-FR-11 places holds in a later phase, and no hold table exists yet.
-`hold_permits_issue` is the point where that rule is evaluated: `issue_copy`
-calls it inside its own transaction, after it has taken its row locks, and
-it currently returns true for every caller. The holds phase replaces the
-function body without moving where the rule runs or changing `issue_copy`.
-`SS007` is reserved for that rejection and is unreachable today.
+This section described a placeholder when migration 002 was written.
+Migration 004 implemented it, and `SS007` is now reachable.
 
-No speculative hold columns were added, in keeping with section 5 of the
-Database Design Description.
+`hold_permits_issue` is still the point where the rule is evaluated:
+`issue_copy` calls it inside its own transaction, after it has taken its
+row locks. What changed is the body, which now compares the title's free
+copies against the members waiting ahead of this borrower instead of
+returning true for everybody. The rule is described in
+[Discovery and reporting](discovery-and-reporting.md), section 3.
+
+The earlier note here said the holds phase would replace that function
+body without changing `issue_copy`. That turned out to be half right.
+The evaluation point did not move, but `issue_copy` changed in two ways
+it did not anticipate: it takes the title's `book` row lock described in
+section 2, and after inserting the loan it marks the borrower's own
+active hold for that title fulfilled. The rule function could not do the
+second itself, because it is `STABLE` and runs before the loan it would
+have to point at exists.
+
+No speculative hold columns were added to the baseline, in keeping with
+section 5 of the Database Design Description; the `hold` table arrived
+with its own migration.
 
 ## 6. Running the checks
 
