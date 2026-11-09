@@ -16,6 +16,9 @@ erDiagram
     BOOK ||--o{ HOLD : queued_for
     MEMBER ||--o{ HOLD : requests
     LOAN |o--o| HOLD : fulfils
+    STAFF_USER ||--o{ STAFF_SESSION : signs_in_with
+    STAFF_USER |o--o{ LOAN_EVENT : performs
+    LOAN ||--o{ LOAN_EVENT : records
 ```
 
 `BOOK` describes a catalog title or edition. `COPY` represents a physical item. `LOAN` connects one member and one copy for an issue/return event. `BOOK_AUTHOR` resolves the many-to-many author relationship. `CIRCULATION_POLICY` holds the current loan and fine rules; relevant values are copied onto each loan. `HOLD` records one member's place in the queue for a title; a fulfilled hold points at the loan that fulfilled it, which is the only optional relationship in the model.
@@ -32,8 +35,11 @@ erDiagram
 | circulation_policy | policy_id | — | — |
 | loan | loan_id | one open loan per copy (partial unique index) | copy, member, policy |
 | hold | hold_id | one active hold per (book_id, member_id) (partial unique index) | book, member, loan (nullable) |
+| staff_user | staff_user_id | username | — |
+| staff_session | token_hash | — | staff_user |
+| loan_event | loan_event_id | — | loan, staff_user (nullable) |
 
-The physical schema is [db/001_baseline.sql](../db/001_baseline.sql), extended by migrations 002 to 005. A partial unique index on `loan(copy_id) WHERE returned_on IS NULL` enforces the central cardinality rule, and `hold(book_id, member_id) WHERE status = 'active'` enforces the equivalent rule for the hold queue. Both are partial so that resolved history — a returned loan, a cancelled hold — does not block a new row. Foreign keys preserve history by restricting deletion of referenced records.
+The physical schema is [db/001_baseline.sql](../db/001_baseline.sql), extended by migrations 002 to 006. A partial unique index on `loan(copy_id) WHERE returned_on IS NULL` enforces the central cardinality rule, and `hold(book_id, member_id) WHERE status = 'active'` enforces the equivalent rule for the hold queue. Both are partial so that resolved history — a returned loan, a cancelled hold — does not block a new row. Foreign keys preserve history by restricting deletion of referenced records.
 
 ## 3. Functional dependencies and normalization
 
@@ -61,7 +67,7 @@ Holds add a third lock to the circulation order. Because the hold rule compares 
 
 Search indexes are no longer deferred: migration 003 adds GIN indexes on `to_tsvector('simple', title)` and `to_tsvector('simple', display_name)`, a btree on `book_author(author_id)` for the author-to-titles traversal, and a btree on `book(title)` for paginated catalog browsing. Each one was measured with and against its absence on a 20,000-title, 150,000-loan dataset, and one further index proposed for the hold queue was measured and rejected as redundant. The results are in [Query performance](query-performance.md).
 
-Payments, audit events, and multi-branch inventory are still not represented. Their designs require separate decisions and migrations rather than speculative columns.
+Migration 006 records issue and return audit events through triggers, including an optional staff actor. Payments and multi-branch inventory are not represented. MongoDB reading lists are a separate document model, described in [Application and NoSQL design](application-and-nosql.md).
 
 ## 6. Change control
 

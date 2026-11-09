@@ -1,7 +1,7 @@
 # Software Requirements Specification (SRS)
 
 **Project:** ShelfSense
-**Status:** Initial baseline for review
+**Status:** Implemented baseline, subject to project review
 **Scope:** Single-library circulation system
 
 ## 1. Purpose and boundary
@@ -16,7 +16,7 @@ This specification records intended behavior. An item is implemented only when i
 - **Member:** has a registered account and borrows copies; a self-service interface is not required initially.
 - **Project maintainer:** configures policy, deploys the application, and reviews database changes.
 
-The application will use PostgreSQL as the authoritative store. A Next.js server layer will handle authenticated staff requests and transactions. Browser code will not connect directly to PostgreSQL.
+PostgreSQL owns catalog, circulation, staff identity, and policy. MongoDB stores staff-curated reading lists, whose book identifiers are resolved against PostgreSQL when displayed. A Next.js server layer handles authenticated staff requests. Browser code connects to neither database directly.
 
 ## 3. Functional requirements
 
@@ -32,9 +32,12 @@ The application will use PostgreSQL as the authoritative store. A Next.js server
 | FR-08 | Staff shall see copy availability derived from open loans and withdrawal state. | Issue, return, and withdraw copies; availability changes accordingly. |
 | FR-09 | Staff shall search titles by title, author, or ISBN. | Search sample records and inspect results. |
 | FR-10 | Staff shall view overdue loans and circulation summaries. | Compare report results with known fixture data. |
-| FR-11 | Members shall be able to join a title's hold queue; fulfillment shall follow request order among active holds. | Create two holds and verify fulfillment order. |
+| FR-11 | Staff shall place a member into a title's hold queue; fulfillment shall follow request order among active holds. | Create two holds and verify fulfillment order. |
+| FR-12 | Staff shall create, read, update, and delete curated reading lists with notes; each listed title shall resolve to current catalog data and availability. | Exercise all four MongoDB operations and confirm a removed title is shown safely. |
+| FR-13 | Administrators shall manage policy and staff accounts; librarians shall perform daily library work without administrator privileges. | Test both roles at the API and reject unauthorized policy and staff writes in PostgreSQL. |
+| FR-14 | The system shall record issue and return events with the acting staff member when one is available, and shall report daily issue counts including days with no issues. | Check trigger output and a recursive date report with quiet days. |
 
-FR-08 through FR-11 are implemented at the database layer by migrations 003 to 005 and verified; see the [Discovery and reporting](discovery-and-reporting.md) description. They are not yet reachable through an interface, which is FR-01 through FR-11's remaining dependency on the application phase.
+FR-01 through FR-14 are implemented in the database and staff application. FR-11 is served through a staff-assisted hold form; member self-service remains outside this release. The checks are described in [Application and NoSQL design](application-and-nosql.md).
 
 ## 4. Data and business rules
 
@@ -55,7 +58,7 @@ FR-08 through FR-11 are implemented at the database layer by migrations 003 to 0
 | --- | --- | --- |
 | QR-01 | Circulation writes shall be atomic. A failed issue or return shall leave no partial change. | Force an error inside a transaction and confirm rollback. |
 | QR-02 | The database shall enforce referential integrity and the one-open-loan-per-copy rule independently of the interface. | Direct SQL negative tests. |
-| QR-03 | Staff-only mutations shall require server-side authorization in the web application. | Unauthenticated and member-role requests are denied. |
+| QR-03 | Staff-only mutations shall require server-side authorization; administrator writes to staff and policy records shall also be guarded by PostgreSQL. | Unauthenticated requests, librarian administrator requests, and direct SQL writes without an administrator identity are denied. |
 | QR-04 | The application shall display dates and amounts unambiguously, including the fine's as-of date and configured currency. | Interface review with overdue and returned examples. |
 | QR-05 | Schema changes shall be reproducible from versioned SQL files against an empty database. | Apply migrations in order to a clean database. |
 
@@ -63,7 +66,7 @@ No response-time target is asserted. Query plans and index choices for the disco
 
 ## 6. Traceability and acceptance
 
-The issue tracker will link each requirement to implementation and test evidence. A requirement is complete when its acceptance checks pass and the result is reviewed in a PR. The baseline schema covers part of FR-01, FR-02, FR-03, FR-04, FR-06, FR-07, QR-02, and QR-05. The circulation migration carries FR-03 through FR-07, QR-01, QR-02, and QR-04 at the database layer, with the evidence listed in the [Circulation workflow](circulation-workflow.md). The discovery, holds, and reporting migrations carry FR-08, FR-09, FR-10, and FR-11, with the evidence listed in [Discovery and reporting](discovery-and-reporting.md) and the measured plans in [Query performance](query-performance.md). The staff interface and QR-03 authorization remain to be implemented, so no functional requirement is yet complete end to end.
+The issue tracker links requirements to implementation and checks. Migrations 001–005 cover FR-01 through FR-11, with evidence in [Circulation workflow](circulation-workflow.md), [Discovery and reporting](discovery-and-reporting.md), and [Query performance](query-performance.md). Migration 006, the Next.js application, and the MongoDB collection cover FR-12 through FR-14 and QR-03. The application checks include HTTP requests against disposable PostgreSQL and MongoDB instances. Project review remains a separate step.
 
 ## 7. Terminology
 

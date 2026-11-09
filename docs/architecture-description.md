@@ -1,7 +1,7 @@
 # Architecture Description (AD)
 
 **Project:** ShelfSense
-**Status:** Proposed architecture; implementation pending
+**Status:** Implemented architecture, subject to project review
 
 ## 1. System of interest and concerns
 
@@ -14,11 +14,12 @@ flowchart LR
     Staff[Librarian] --> Browser[Browser]
     Browser --> Server[Next.js server layer]
     Server --> DB[(PostgreSQL)]
+    Server --> Lists[(MongoDB reading lists)]
     Maintainer[Project maintainer] --> Server
     Maintainer --> DB
 ```
 
-The server layer owns authentication, authorization, validation, and transaction boundaries. PostgreSQL owns durable records and integrity constraints. Browser code receives application responses and does not hold database credentials.
+The server layer owns authentication, request validation, and transaction boundaries. PostgreSQL owns circulation records, staff identities, access guards for administrator writes, and integrity constraints. MongoDB owns only curated reading-list documents. Browser code receives application responses and does not hold database credentials.
 
 ## 3. Container responsibilities
 
@@ -27,6 +28,7 @@ The server layer owns authentication, authorization, validation, and transaction
 | Next.js interface | Staff forms, search, circulation screens, readable errors | No direct SQL connection from browser |
 | Server-side application code | Permission checks, policy lookup, transactional workflows | Uses parameterized queries; does not duplicate database uniqueness rules |
 | PostgreSQL | Titles, authors, copies, members, loans, constraints, fine calculation | Authoritative system of record |
+| MongoDB | Staff-curated reading lists with per-title notes | References PostgreSQL book IDs; no circulation truth |
 
 ## 4. Circulation interaction view
 
@@ -46,7 +48,7 @@ The title row lock exists because the hold rule is a comparison of counts, free 
 
 ## 5. Data and security views
 
-The relational model is described in the [Database Design Description](database-design-description.md). Copies, members, and loans retain stable identifiers. Historical loans are not deleted as part of normal workflows. Staff permissions will be checked by the server layer before mutations; database credentials stay in server-side configuration. Deployment secrets and member data will not be committed to the repository.
+The relational model is described in the [Database Design Description](database-design-description.md). Copies, members, and loans retain stable identifiers. Historical loans are not deleted as part of normal workflows. Passwords use salted scrypt hashes; opaque session tokens are hashed before storage, expire after eight hours, and are sent in HTTP-only, SameSite cookies. Both API handlers and PostgreSQL guard administrator writes. The server sets the acting staff ID only within a transaction. This database guard assumes the database credentials and session context remain confined to the trusted server; it is not a defense against a compromised database account. Deployment secrets and member data are not committed.
 
 ## 6. Decisions and tradeoffs
 
@@ -57,14 +59,14 @@ The relational model is described in the [Database Design Description](database-
 | Derive availability from open loans | Avoids a second mutable status that can disagree with loan history. | Availability queries need an indexed open-loan lookup, and a catalog browse has to be paginated against an ordered index rather than counting every title. |
 | Hold a title, not a copy | A member waits for the work; any copy satisfies the wait. | Fulfillment is decided at issue time by counting free copies against the queue, not by attaching a copy to a hold in advance. |
 | Reserve one copy per hold rather than blocking all lending | A single hold on a multi-copy title should not stop every walk-in borrowing it. | The rule needs a title-level lock so that concurrent issues cannot over-allocate the queue. |
-| Keep PostgreSQL as sole authoritative store | Makes constraints and transactions reviewable for the DBMS course. | No independent NoSQL state in the core workflow. |
+| Keep circulation in PostgreSQL; use MongoDB for curated lists | Relational constraints protect loans while variable-length notes fit a document. | Lists display live title and availability data from PostgreSQL; a removed title is marked unavailable. |
 
-Neo4j and vector search may be evaluated as optional, isolated demonstrations after the transactional system works. They will not be required for circulation correctness.
+Graph and vector databases are not part of this release. The course's NoSQL-or-vector criterion is addressed through a working MongoDB collection and create, read, update, and delete operations.
 
 ## 7. Verification approach
 
-Database constraint tests, transaction/concurrency tests, server authorization tests, and end-to-end issue/return tests will be linked to requirements.
+Database constraint tests, transaction/concurrency tests, server authorization tests, and end-to-end issue/return checks are linked to requirements and the application documentation.
 
-Constraint and behavior tests exist for the baseline, circulation, discovery, holds, and reporting layers as deterministic SQL scripts that roll their fixtures back, and concurrency is covered by two scripts that run real pairs of psql sessions: one for the one-open-loan rule, one for the hold queue. Query plans have been measured on a representative dataset of 20,000 titles and 150,000 loans, and the results, including an index the measurement rejected and one the dataset is the wrong shape to judge, are recorded in [Query performance](query-performance.md). Server authorization tests and end-to-end tests belong to the application phase and do not exist yet.
+Constraint and behavior tests exist for all six migrations as deterministic SQL scripts that roll their fixtures back. Two scripts run pairs of psql sessions for the one-open-loan rule and hold queue. Query plans were measured on a 20,000-title, 150,000-loan dataset; see [Query performance](query-performance.md). The application suite covers password verification and MongoDB collection behavior. Disposable-environment HTTP checks cover login, both staff roles, circulation, audit, reports, and reading-list CRUD; see [Application and NoSQL design](application-and-nosql.md).
 
 The name and view-based structure are informed by [ISO/IEC/IEEE 42010:2022](https://www.iso.org/standard/74393.html). This tailored description is not asserted to conform to the full standard.
