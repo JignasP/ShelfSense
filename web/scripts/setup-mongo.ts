@@ -1,4 +1,7 @@
+import { existsSync } from 'node:fs'
 import { readingLists } from '../lib/mongo'
+
+if (existsSync('.env.local')) process.loadEnvFile('.env.local')
 
 async function main() {
   const collection = await readingLists()
