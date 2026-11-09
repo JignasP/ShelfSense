@@ -1,0 +1,23 @@
+'use client'
+
+import { type FormEvent } from 'react'
+import type { Overview } from '@/lib/client-types'
+import type { ActionRunner } from '@/app/workspace'
+
+export function AdminPanel({ overview, onAction, busy }: { overview: Overview; onAction: ActionRunner; busy: boolean }) {
+  async function savePolicy(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const form = new FormData(event.currentTarget)
+    await onAction({ action: 'policy.save', loanLimit: Number(form.get('loanLimit')), loanDays: Number(form.get('loanDays')), graceDays: Number(form.get('graceDays')), fineMinorPerDay: Number(form.get('fineMinorPerDay')), maxFineMinor: Number(form.get('maxFineMinor')), currencyCode: String(form.get('currencyCode')).toUpperCase(), currencyMinorDigits: Number(form.get('currencyMinorDigits')) }, 'Circulation policy saved')
+  }
+  async function createStaff(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const element = event.currentTarget
+    const form = new FormData(element)
+    if (await onAction({ action: 'staff.create', username: String(form.get('username')), displayName: String(form.get('displayName')), password: String(form.get('password')), role: String(form.get('role')) }, 'Staff account created')) element.reset()
+  }
+  return <div className="stack"><div className="two-col"><div className="panel"><div className="panel-heading"><div><p className="eyebrow">Library rules</p><h2>Circulation policy</h2></div></div><p className="hint">Changes apply to future loans. Existing loans retain their fine-policy snapshot.</p><form key={JSON.stringify(overview.policy)} className="form-grid" onSubmit={savePolicy}><label>Loan limit<input name="loanLimit" type="number" min="1" max="100" defaultValue={overview.policy?.loan_limit ?? 3} required /></label><label>Loan duration (days)<input name="loanDays" type="number" min="1" max="365" defaultValue={overview.policy?.loan_days ?? 14} required /></label><label>Grace period (days)<input name="graceDays" type="number" min="0" max="365" defaultValue={overview.policy?.grace_days ?? 0} required /></label><label>Fine per day (minor units)<input name="fineMinorPerDay" type="number" min="0" defaultValue={overview.policy?.fine_minor_per_day ?? 0} required /></label><label>Fine cap (minor units)<input name="maxFineMinor" type="number" min="0" defaultValue={overview.policy?.max_fine_minor ?? 0} required /></label><label>Currency code<input name="currencyCode" pattern="[A-Za-z]{3}" maxLength={3} defaultValue={overview.policy?.currency_code ?? 'XXX'} required /></label><label>Currency decimal digits<input name="currencyMinorDigits" type="number" min="0" max="4" defaultValue={overview.policy?.currency_minor_digits ?? 2} required /></label><div className="form-actions"><button className="button primary" disabled={busy}>Save policy</button></div></form></div>
+      <div className="panel"><div className="panel-heading"><div><p className="eyebrow">Access control</p><h2>Add staff account</h2></div></div><form className="form-grid" onSubmit={createStaff}><label>Username<input name="username" pattern="[a-z0-9._-]{3,40}" required /></label><label>Display name<input name="displayName" required maxLength={200} /></label><label className="wide">Temporary password<input name="password" type="password" minLength={12} maxLength={128} autoComplete="new-password" required /></label><label className="wide">Role<select name="role"><option value="librarian">Librarian · circulation and catalog</option><option value="admin">Administrator · policy and accounts</option></select></label><div className="form-actions"><button className="button primary" disabled={busy}>Create account</button></div></form></div></div>
+    <div className="panel"><div className="panel-heading"><div><p className="eyebrow">Team</p><h2>Staff accounts</h2></div></div><div className="table-wrap"><table><thead><tr><th>Username</th><th>Name</th><th>Role</th><th>Status</th><th></th></tr></thead><tbody>{overview.staff.map((staff) => <tr key={staff.staff_user_id}><td className="mono">{staff.username}</td><td><strong>{staff.display_name}</strong></td><td>{staff.role}</td><td><span className={`badge ${staff.active ? 'green' : 'gray'}`}>{staff.active ? 'Active' : 'Inactive'}</span></td><td><button className="table-action" disabled={busy || staff.staff_user_id === overview.user.staff_user_id} onClick={() => void onAction({ action: 'staff.setActive', staffUserId: staff.staff_user_id, active: !staff.active }, staff.active ? 'Account deactivated' : 'Account activated')}>{staff.active ? 'Deactivate' : 'Activate'}</button></td></tr>)}</tbody></table></div></div>
+  </div>
+}
