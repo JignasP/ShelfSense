@@ -27,6 +27,8 @@ Administrators manage staff and circulation policy. Librarians use catalog, memb
 
 The same migration records loan issue and return events through triggers. `daily_issues` uses a recursive CTE to emit each date, including dates with zero issues. Earlier migrations supply joins, full-text search, nested queries, views, window functions, grouping, and transaction-safe circulation functions. See the [course coverage matrix](course-coverage.md) for file-level evidence.
 
+Migration 007 adds `save_circulation_policy`, which the administrator screen calls, and `purge_expired_staff_sessions`, which can be called for session maintenance. A trigger refuses session creation or reassignment for inactive staff. The [database routines demonstration](database-routines-demonstration.md) shows the two `CALL` results, the rejected writes, and issue/return audit events in a rollback-based fixture.
+
 ## Verification
 
 Run six SQL verification files after migrations against a clean disposable database. Each rolls its fixture data back. Run `npm run typecheck`, `npm run lint`, `npm test`, and `npm run build` inside `web`. The MongoDB test starts a disposable in-memory server and checks collection creation, validation, and document CRUD. The password test checks salted hashes and verification.

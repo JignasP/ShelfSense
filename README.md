@@ -23,6 +23,7 @@ Payments, multi-branch transfers, member self-service, graph storage, and vector
 | Circulation workflow | [docs/circulation-workflow.md](docs/circulation-workflow.md) |
 | Discovery and reporting | [docs/discovery-and-reporting.md](docs/discovery-and-reporting.md) |
 | Query performance | [docs/query-performance.md](docs/query-performance.md) |
+| Database routines demonstration | [docs/database-routines-demonstration.md](docs/database-routines-demonstration.md) |
 | Course coverage and marking evidence | [docs/course-coverage.md](docs/course-coverage.md) |
 
 The information-item names are tailored from ISO/IEC/IEEE 29148:2018, 42010:2022, and 15289:2019. This project does not claim standards conformance or certification.
@@ -35,7 +36,7 @@ Prerequisites: Node.js 24, npm, PostgreSQL 17, and MongoDB 8. The included `comp
 2. Create a database named `shelfsense` if using an existing PostgreSQL server. Apply the migrations in order:
 
    ```sh
-   for file in db/00[1-6]_*.sql; do psql -X -v ON_ERROR_STOP=1 -d shelfsense -f "$file"; done
+   for file in db/00[1-7]_*.sql; do psql -X -v ON_ERROR_STOP=1 -d shelfsense -f "$file"; done
    ```
 
 3. Copy `web/.env.example` to `web/.env.local` and set its database URLs, MongoDB database name, and library timezone. From `web`, run `npm ci` and `npm run setup:mongo`.
@@ -43,6 +44,8 @@ Prerequisites: Node.js 24, npm, PostgreSQL 17, and MongoDB 8. The included `comp
 5. Set policy values in the administrator screen before issuing the first loan. Run `npm run dev` from `web` and open the local URL printed by Next.js. The policy starts unconfigured because loan limits, fine rates, and currency are library decisions.
 
 The root `.env` is read by Docker Compose; Next.js reads `web/.env.local`. Do not commit either file. Migration 006 requires the first staff account to be an administrator; later staff and policy writes require an active administrator identity. The MongoDB collection is created by `setup:mongo` or on the first reading-list request.
+
+Apply migration 007 before starting this version of the web application. The policy screen calls its `save_circulation_policy` procedure.
 
 ## Verification
 
@@ -55,6 +58,8 @@ done
 ```
 
 From `web`, run `npm run typecheck`, `npm run lint`, `npm test`, and `npm run build`. For an end-to-end API check, start the app against disposable PostgreSQL and MongoDB databases, create a temporary administrator, set `TEST_BASE_URL`, `TEST_ADMIN_USERNAME`, and `TEST_ADMIN_PASSWORD`, then run `npm run verify:http`. This check creates persistent fixtures. The two-session concurrency checks are `scripts/verify_concurrency.sh` and `scripts/verify_hold_concurrency.sh`; run them against a disposable database because they briefly commit fixture rows. Query-plan measurement uses `db/perf_dataset.sql` and `scripts/measure_query_plans.sh`; its dataset and recorded results are in [Query performance](docs/query-performance.md).
+
+To show PostgreSQL procedure and trigger output, use a separate clean test database and run `psql -X -v ON_ERROR_STOP=1 -d shelfsense_routines_test -f db/demo_routines.sql` after all migrations. The script checks its results and rolls back its fixture rows. See [Database routines demonstration](docs/database-routines-demonstration.md) for the expected output.
 
 ## Development
 

@@ -69,6 +69,8 @@ Search indexes are no longer deferred: migration 003 adds GIN indexes on `to_tsv
 
 Migration 006 records issue and return audit events through triggers, including an optional staff actor. Payments and multi-branch inventory are not represented. MongoDB reading lists are a separate document model, described in [Application and NoSQL design](application-and-nosql.md).
 
+Migration 007 supplies policy and expired-session procedures. Its session trigger rejects creation or reassignment of a session for an inactive staff user. The application also checks `staff_user.active` on every authenticated request, so deactivating staff makes an existing session unusable without deleting its row immediately.
+
 ## 6. Change control
 
 Migration files are append-only after adoption. Schema revisions should include a rationale, migration, data preservation plan, and database checks. The initial migration targets a clean database and should not be run twice against the same database.

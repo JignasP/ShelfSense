@@ -15,6 +15,7 @@ const businessErrors: Record<string, [number, string]> = {
   SS013: [409, 'Member already has an active hold'], SS014: [404, 'Hold not found'],
   SS015: [409, 'Hold is no longer active'],
   SS016: [403, 'Active administrator required'],
+  SS017: [409, 'Staff account is inactive'],
 }
 
 export function errorResponse(error: unknown): NextResponse {
