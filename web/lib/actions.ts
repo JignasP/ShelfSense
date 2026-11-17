@@ -114,10 +114,11 @@ export async function executeAction(user: StaffUser, raw: unknown): Promise<unkn
     case 'policy.save': {
       adminOnly(user)
       const input = z.object({ loanLimit: z.number().int().min(1).max(100), loanDays: z.number().int().min(1).max(365), graceDays: z.number().int().min(0).max(365), fineMinorPerDay: z.number().int().min(0).max(1000000), maxFineMinor: z.number().int().min(0).max(100000000), currencyCode: z.string().regex(/^[A-Z]{3}$/), currencyMinorDigits: z.number().int().min(0).max(4) }).parse(raw)
-      return withActor(user.staff_user_id, async (client) => (await client.query(`INSERT INTO circulation_policy (policy_id, loan_limit, loan_days, grace_days, fine_minor_per_day, max_fine_minor, currency_code, currency_minor_digits)
-        VALUES (1,$1,$2,$3,$4,$5,$6,$7)
-        ON CONFLICT (policy_id) DO UPDATE SET loan_limit=$1, loan_days=$2, grace_days=$3, fine_minor_per_day=$4, max_fine_minor=$5, currency_code=$6, currency_minor_digits=$7 RETURNING *`,
-      [input.loanLimit, input.loanDays, input.graceDays, input.fineMinorPerDay, input.maxFineMinor, input.currencyCode, input.currencyMinorDigits])).rows[0])
+      return withActor(user.staff_user_id, async (client) => {
+        await client.query('CALL save_circulation_policy($1,$2,$3,$4,$5,$6,$7)',
+          [input.loanLimit, input.loanDays, input.graceDays, input.fineMinorPerDay, input.maxFineMinor, input.currencyCode, input.currencyMinorDigits])
+        return (await client.query('SELECT * FROM circulation_policy WHERE policy_id = 1')).rows[0]
+      })
     }
     case 'staff.create': {
       adminOnly(user)

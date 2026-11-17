@@ -51,6 +51,7 @@ FR-01 through FR-14 are implemented in the database and staff application. FR-11
 - A hold is placed on a title, not on a copy, and any copy of the title satisfies it. A member may hold one title at most once at a time, and a hold is resolved by cancellation or by fulfillment rather than by deletion.
 - A hold reserves one available copy for the member waiting. An issue to anybody else is refused only when it would leave a member already in the queue without a copy.
 - Copy availability is derived from copy and loan records, never stored as a separate status.
+- A staff session can be issued only to an active staff account. Existing sessions stop granting access when that account is deactivated.
 
 ## 5. Quality and interface requirements
 
@@ -66,7 +67,7 @@ No response-time target is asserted. Query plans and index choices for the disco
 
 ## 6. Traceability and acceptance
 
-The issue tracker links requirements to implementation and checks. Migrations 001–005 cover FR-01 through FR-11, with evidence in [Circulation workflow](circulation-workflow.md), [Discovery and reporting](discovery-and-reporting.md), and [Query performance](query-performance.md). Migration 006, the Next.js application, and the MongoDB collection cover FR-12 through FR-14 and QR-03. The application checks include HTTP requests against disposable PostgreSQL and MongoDB instances. Project review remains a separate step.
+The issue tracker links requirements to implementation and checks. Migrations 001–005 cover FR-01 through FR-11, with evidence in [Circulation workflow](circulation-workflow.md), [Discovery and reporting](discovery-and-reporting.md), and [Query performance](query-performance.md). Migrations 006–007, the Next.js application, and the MongoDB collection cover FR-12 through FR-14 and QR-03. The [database routines demonstration](database-routines-demonstration.md) records the procedure and trigger output. The application checks include HTTP requests against disposable PostgreSQL and MongoDB instances. Project review remains a separate step.
 
 ## 7. Terminology
 
